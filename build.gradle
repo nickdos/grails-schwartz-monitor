@@ -29,8 +29,9 @@ apply plugin: 'idea'
 apply plugin: 'spring-boot'
 apply plugin: 'org.grails.grails-plugin'
 apply plugin: 'org.grails.grails-gsp'
+apply plugin: "maven-publish"
 // Used for publishing to central repository, remove if not needed
-apply from:'https://raw.githubusercontent.com/grails/grails-profile-repository/master/profiles/plugin/templates/grailsCentralPublishing.gradle'
+// apply from:'https://raw.githubusercontent.com/grails/grails-profile-repository/master/profiles/plugin/templates/grailsCentralPublishing.gradle'
 // apply from:'https://raw.githubusercontent.com/grails/grails-profile-repository/master/profiles/plugin/templates/bintrayPublishing.gradle'
 
 apply plugin: 'org.asciidoctor.convert'
@@ -150,3 +151,35 @@ asciidoctor {
       toclevels            : '2'
 }
 
+publishing {
+    repositories {
+        maven {
+            name 'Nexus'
+            url "https://nexus.ala.org.au/content/repositories/${project.version.endsWith('-SNAPSHOT') ? 'snapshots' : 'releases' }"
+            credentials {
+                username = System.getenv('TRAVIS_DEPLOY_USERNAME')
+                password = System.getenv('TRAVIS_DEPLOY_PASSWORD')
+            }
+        }
+    }
+    publications {
+        mavenJar(MavenPublication) {
+            pom.withXml {
+                def pomNode = asNode()
+                pomNode.dependencyManagement.replaceNode {}
+
+                // simply remove dependencies without a version
+                // version-less dependencies are handled with dependencyManagement
+                // see https://github.com/spring-gradle-plugins/dependency-management-plugin/issues/8 for more complete solutions
+                pomNode.dependencies.dependency.findAll {
+                    it.version.text().isEmpty()
+                }.each {
+                    it.replaceNode {}
+                }
+            }
+//            classifier "ala"
+            from components.java
+
+        }
+    }
+}
